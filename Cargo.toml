@@ -1,13 +1,11 @@
 [package]
-name = "tab-bar"
+name = "tab-bar-baz"
 version = "0.1.0"
-authors = ["Jonah Caplan <jonahcaplan@gmail.com>"]
 edition = "2021"
-license = "MIT"
 
 [dependencies]
 colored = "2"
 ansi_term = "0.12"
 unicode-width = "0.1.8"
-zellij-tile = { path = "../../zellij-tile" }
-zellij-tile-utils = { path = "../../zellij-tile-utils" }
+zellij-tile = "0.39"
+zellij-tile-utils = "0.39"

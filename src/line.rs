@@ -18,6 +18,7 @@ fn populate_tabs_in_tab_line(
     cols: usize,
     palette: Palette,
     capabilities: PluginCapabilities,
+    mode: InputMode,
 ) {
     let mut middle_size = get_current_title_len(tabs_to_render);
 
@@ -34,6 +35,7 @@ fn populate_tabs_in_tab_line(
             palette,
             tab_separator(capabilities),
             left_more_tab_index,
+            mode,
         );
 
         // right_more_tab_index is the first tab to the right of the rightmost visible tab
@@ -43,6 +45,7 @@ fn populate_tabs_in_tab_line(
             palette,
             tab_separator(capabilities),
             right_more_tab_index,
+            mode,
         );
 
         let total_size = collapsed_left.len + middle_size + collapsed_right.len;
@@ -111,6 +114,7 @@ fn left_more_message(
     palette: Palette,
     separator: &str,
     tab_index: usize,
+    mode: InputMode,
 ) -> LinePart {
     if tab_count_to_the_left == 0 {
         return LinePart::default();
@@ -123,9 +127,11 @@ fn left_more_message(
     // 238
     // chars length plus separator length on both sides
     let more_text_len = more_text.width() + 2 * separator.width();
-    let (text_color, sep_color) = match palette.theme_hue {
-        ThemeHue::Dark => (palette.white, palette.black),
-        ThemeHue::Light => (palette.black, palette.white),
+    let (text_color, sep_color) = match (mode, palette.theme_hue) {
+        (InputMode::Locked, ThemeHue::Dark) => (palette.white, palette.black),
+        (_, ThemeHue::Dark) => (palette.black, palette.white),
+        (InputMode::Locked, ThemeHue::Light) => (palette.black, palette.white),
+        (_, ThemeHue::Light) => (palette.white, palette.black),
     };
     let left_separator = style!(sep_color, palette.orange).paint(separator);
     let more_styled_text = style!(text_color, palette.orange).bold().paint(more_text);
@@ -144,6 +150,7 @@ fn right_more_message(
     palette: Palette,
     separator: &str,
     tab_index: usize,
+    mode: InputMode,
 ) -> LinePart {
     if tab_count_to_the_right == 0 {
         return LinePart::default();
@@ -155,9 +162,11 @@ fn right_more_message(
     };
     // chars length plus separator length on both sides
     let more_text_len = more_text.width() + 2 * separator.width();
-    let (text_color, sep_color) = match palette.theme_hue {
-        ThemeHue::Dark => (palette.white, palette.black),
-        ThemeHue::Light => (palette.black, palette.white),
+    let (text_color, sep_color) = match (mode, palette.theme_hue) {
+        (InputMode::Locked, ThemeHue::Dark) => (palette.white, palette.black),
+        (_, ThemeHue::Dark) => (palette.black, palette.white),
+        (InputMode::Locked, ThemeHue::Light) => (palette.black, palette.white),
+        (_, ThemeHue::Light) => (palette.white, palette.black),
     };
     let left_separator = style!(sep_color, palette.orange).paint(separator);
     let more_styled_text = style!(text_color, palette.orange).bold().paint(more_text);
@@ -171,17 +180,26 @@ fn right_more_message(
     }
 }
 
-fn tab_line_prefix(session_name: Option<&str>, palette: Palette, cols: usize) -> Vec<LinePart> {
+fn tab_line_prefix(
+    session_name: Option<&str>,
+    palette: Palette,
+    cols: usize,
+    mode: InputMode,
+) -> Vec<LinePart> {
     let prefix_text = " Zellij ".to_string();
 
     let prefix_text_len = prefix_text.chars().count();
-    let text_color = match palette.theme_hue {
-        ThemeHue::Dark => palette.white,
-        ThemeHue::Light => palette.black,
+    let text_color = match (mode, palette.theme_hue) {
+        (InputMode::Locked, ThemeHue::Dark) => palette.white,
+        (_, ThemeHue::Dark) => palette.black,
+        (InputMode::Locked, ThemeHue::Light) => palette.black,
+        (_, ThemeHue::Light) => palette.white,
     };
-    let bg_color = match palette.theme_hue {
-        ThemeHue::Dark => palette.black,
-        ThemeHue::Light => palette.white,
+    let bg_color = match (mode, palette.theme_hue) {
+        (InputMode::Locked, ThemeHue::Dark) => palette.black,
+        (_, ThemeHue::Dark) => palette.white,
+        (InputMode::Locked, ThemeHue::Light) => palette.white,
+        (_, ThemeHue::Light) => palette.black,
     };
     let prefix_styled_text = style!(text_color, bg_color).bold().paint(prefix_text);
     let mut parts = vec![LinePart {
@@ -192,9 +210,11 @@ fn tab_line_prefix(session_name: Option<&str>, palette: Palette, cols: usize) ->
     if let Some(name) = session_name {
         let name_part = format!("({}) ", name);
         let name_part_len = name_part.width();
-        let text_color = match palette.theme_hue {
-            ThemeHue::Dark => palette.white,
-            ThemeHue::Light => palette.black,
+        let text_color = match (mode, palette.theme_hue) {
+            (InputMode::Locked, ThemeHue::Dark) => palette.white,
+            (_, ThemeHue::Dark) => palette.black,
+            (InputMode::Locked, ThemeHue::Light) => palette.black,
+            (_, ThemeHue::Light) => palette.white,
         };
         let name_part_styled_text = style!(text_color, bg_color).bold().paint(name_part);
         if cols.saturating_sub(prefix_text_len) >= name_part_len {
@@ -216,6 +236,7 @@ pub fn tab_separator(capabilities: PluginCapabilities) -> &'static str {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn tab_line(
     session_name: Option<&str>,
     mut all_tabs: Vec<LinePart>,
@@ -224,6 +245,7 @@ pub fn tab_line(
     palette: Palette,
     capabilities: PluginCapabilities,
     hide_session_name: bool,
+    mode: InputMode,
 ) -> Vec<LinePart> {
     let mut tabs_after_active = all_tabs.split_off(active_tab_index);
     let mut tabs_before_active = all_tabs;
@@ -233,8 +255,8 @@ pub fn tab_line(
         tabs_before_active.pop().unwrap()
     };
     let mut prefix = match hide_session_name {
-        true => tab_line_prefix(None, palette, cols),
-        false => tab_line_prefix(session_name, palette, cols),
+        true => tab_line_prefix(None, palette, cols, mode),
+        false => tab_line_prefix(session_name, palette, cols, mode),
     };
     let prefix_len = get_current_title_len(&prefix);
 
@@ -252,6 +274,7 @@ pub fn tab_line(
         cols.saturating_sub(prefix_len),
         palette,
         capabilities,
+        mode,
     );
     prefix.append(&mut tabs_to_render);
     prefix

@@ -32,23 +32,31 @@ register_plugin!(State);
 
 impl ZellijPlugin for State {
     fn load(&mut self, _configuration: BTreeMap<String, String>) {
-        set_selectable(false);
         subscribe(&[
+            EventType::PermissionRequestResult,
             EventType::TabUpdate,
             EventType::ModeUpdate,
             EventType::Mouse,
+        ]);
+        request_permission(&[
+            PermissionType::ReadApplicationState,
+            PermissionType::ChangeApplicationState,
+            PermissionType::RunCommands,
         ]);
     }
 
     fn update(&mut self, event: Event) -> bool {
         let mut should_render = false;
         match event {
+            Event::PermissionRequestResult(_) => {
+                set_selectable(false);
+            }
             Event::ModeUpdate(mode_info) => {
                 if self.mode_info != mode_info {
                     should_render = true;
                 }
                 self.mode_info = mode_info;
-            },
+            }
             Event::TabUpdate(tabs) => {
                 if let Some(active_tab_index) = tabs.iter().position(|t| t.active) {
                     // tabs are indexed starting from 1 so we need to add 1
@@ -62,25 +70,25 @@ impl ZellijPlugin for State {
                 } else {
                     eprintln!("Could not find active tab.");
                 }
-            },
+            }
             Event::Mouse(me) => match me {
                 Mouse::LeftClick(_, col) => {
                     let tab_to_focus = get_tab_to_focus(&self.tab_line, self.active_tab_idx, col);
                     if let Some(idx) = tab_to_focus {
                         switch_tab_to(idx.try_into().unwrap());
                     }
-                },
+                }
                 Mouse::ScrollUp(_) => {
                     switch_tab_to(min(self.active_tab_idx + 1, self.tabs.len()) as u32);
-                },
+                }
                 Mouse::ScrollDown(_) => {
                     switch_tab_to(max(self.active_tab_idx.saturating_sub(1), 1) as u32);
-                },
-                _ => {},
+                }
+                _ => {}
             },
             _ => {
                 eprintln!("Got unrecognized event: {:?}", event);
-            },
+            }
         }
         should_render
     }
@@ -108,6 +116,7 @@ impl ZellijPlugin for State {
                 is_alternate_tab,
                 self.mode_info.style.colors,
                 self.mode_info.capabilities,
+                self.mode_info.mode,
             );
             is_alternate_tab = !is_alternate_tab;
             all_tabs.push(tab);
@@ -120,6 +129,7 @@ impl ZellijPlugin for State {
             self.mode_info.style.colors,
             self.mode_info.capabilities,
             self.mode_info.style.hide_session_name,
+            self.mode_info.mode,
         );
 
         let output = self
@@ -127,17 +137,19 @@ impl ZellijPlugin for State {
             .iter()
             .fold(String::new(), |output, part| output + &part.part);
 
-        let background = match self.mode_info.style.colors.theme_hue {
-            ThemeHue::Dark => self.mode_info.style.colors.black,
-            ThemeHue::Light => self.mode_info.style.colors.white,
+        let background = match (self.mode_info.mode, self.mode_info.style.colors.theme_hue) {
+            (InputMode::Locked, ThemeHue::Dark) => self.mode_info.style.colors.black,
+            (_, ThemeHue::Dark) => self.mode_info.style.colors.white,
+            (InputMode::Locked, ThemeHue::Light) => self.mode_info.style.colors.white,
+            (_, ThemeHue::Light) => self.mode_info.style.colors.black,
         };
         match background {
             PaletteColor::Rgb((r, g, b)) => {
                 print!("{}\u{1b}[48;2;{};{};{}m\u{1b}[0K", output, r, g, b);
-            },
+            }
             PaletteColor::EightBit(color) => {
                 print!("{}\u{1b}[48;5;{}m\u{1b}[0K", output, color);
-            },
+            }
         }
     }
 }

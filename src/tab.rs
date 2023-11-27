@@ -23,24 +23,32 @@ pub fn render_tab(
     is_alternate_tab: bool,
     palette: Palette,
     separator: &str,
+    mode: InputMode,
 ) -> LinePart {
     let focused_clients = tab.other_focused_clients.as_slice();
     let separator_width = separator.width();
-    let alternate_tab_color = match palette.theme_hue {
+    let alternate_tab_color = match (mode, palette.theme_hue) {
         // TODO: only do this if we don't have the arrow capabilities
-        ThemeHue::Dark => palette.white,
-        ThemeHue::Light => palette.black,
+        (InputMode::Locked, ThemeHue::Dark) => palette.white,
+        (_, ThemeHue::Dark) => palette.black,
+        (InputMode::Locked, ThemeHue::Light) => palette.black,
+        (_, ThemeHue::Light) => palette.white,
     };
     let background_color = if tab.active {
         palette.green
     } else if is_alternate_tab {
         alternate_tab_color
     } else {
-        palette.fg
+        match mode {
+            InputMode::Locked => palette.fg,
+            _ => palette.bg,
+        }
     };
-    let foreground_color = match palette.theme_hue {
-        ThemeHue::Dark => palette.black,
-        ThemeHue::Light => palette.white,
+    let foreground_color = match (mode, palette.theme_hue) {
+        (InputMode::Locked, ThemeHue::Dark) => palette.black,
+        (_, ThemeHue::Dark) => palette.white,
+        (InputMode::Locked, ThemeHue::Light) => palette.white,
+        (_, ThemeHue::Light) => palette.black,
     };
     let left_separator = style!(foreground_color, background_color).paint(separator);
     let mut tab_text_len = text.width() + (separator_width * 2) + 2; // +2 for padding
@@ -86,6 +94,7 @@ pub fn tab_style(
     mut is_alternate_tab: bool,
     palette: Palette,
     capabilities: PluginCapabilities,
+    mode: InputMode,
 ) -> LinePart {
     let separator = tab_separator(capabilities);
 
@@ -97,7 +106,7 @@ pub fn tab_style(
         is_alternate_tab = false;
     }
 
-    render_tab(tabname, tab, is_alternate_tab, palette, separator)
+    render_tab(tabname, tab, is_alternate_tab, palette, separator, mode)
 }
 
 pub(crate) fn get_tab_to_focus(
