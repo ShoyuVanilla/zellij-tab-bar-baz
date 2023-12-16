@@ -1,5 +1,6 @@
 mod line;
 mod tab;
+mod weather;
 
 use std::cmp::{max, min};
 use std::collections::BTreeMap;
@@ -10,6 +11,7 @@ use zellij_tile::prelude::*;
 
 use crate::line::tab_line;
 use crate::tab::tab_style;
+use crate::weather::WeatherState;
 
 #[derive(Debug, Default)]
 pub struct LinePart {
@@ -37,11 +39,13 @@ impl ZellijPlugin for State {
             EventType::TabUpdate,
             EventType::ModeUpdate,
             EventType::Mouse,
+            EventType::WebRequestResult,
         ]);
         request_permission(&[
             PermissionType::ReadApplicationState,
             PermissionType::ChangeApplicationState,
             PermissionType::RunCommands,
+            PermissionType::WebAccess,
         ]);
     }
 
@@ -56,6 +60,13 @@ impl ZellijPlugin for State {
                     should_render = true;
                 }
                 self.mode_info = mode_info;
+                web_request(
+                    "http://ip-api.com/json/",
+                    HttpVerb::Get,
+                    BTreeMap::new(),
+                    vec![],
+                    BTreeMap::new(),
+                );
             }
             Event::TabUpdate(tabs) => {
                 if let Some(active_tab_index) = tabs.iter().position(|t| t.active) {
@@ -86,6 +97,10 @@ impl ZellijPlugin for State {
                 }
                 _ => {}
             },
+            Event::WebRequestResult(status, _headers, body, _context) => {
+                let body = String::from_utf8(body).unwrap();
+                eprintln!("{}", body);
+            }
             _ => {
                 eprintln!("Got unrecognized event: {:?}", event);
             }

@@ -1,0 +1,14 @@
+layout {
+    pane split_direction="horizontal" {
+        pane stacked=true size="80%" {
+            pane focus=true
+            pane command="$SHELL" name="COMPILE AND RELOAD PLUGIN" {
+                args "-c" "watchexec 'cargo build && zellij action start-or-reload-plugin file:target/wasm32-wasi/debug/tab-bar-baz.wasm'"
+            }
+        }
+        children
+    }
+    pane size=2 borderless=true {
+        plugin location="zellij:status-bar"
+    }
+}
