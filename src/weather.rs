@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, Timelike, Utc};
 use chrono_tz::Tz;
 use serde::{Deserialize, Deserializer};
 use zellij_tile::prelude::*;
@@ -10,6 +10,8 @@ pub struct WeatherState {
     forecast: Option<WeatherForecastResp>,
     last_updated: Option<DateTime<Utc>>,
     last_requested: Option<DateTime<Utc>>,
+    last_rendered: Option<DateTime<Utc>>,
+    rendered: String,
 }
 
 impl WeatherState {
@@ -19,11 +21,13 @@ impl WeatherState {
             forecast: None,
             last_updated: None,
             last_requested: None,
+            last_rendered: None,
+            rendered: String::from(""),
         }
     }
 
     pub fn run(&mut self) {
-        self.fetch_state = FetchState::GettingLocation;
+        self.fetch_state = FetchState::FetchingLocation;
         web_request(
             "http://ip-api.com/json/",
             HttpVerb::Get,
@@ -37,8 +41,8 @@ impl WeatherState {
         if let Event::WebRequestResult(status, _headers, body, _context) = e {
             match self.fetch_state {
                 FetchState::Idle => {}
-                FetchState::GettingLocation => {}
-                FetchState::GettingForecast => {}
+                FetchState::FetchingLocation => {}
+                FetchState::FetchingForecast => {}
             }
         }
     }
@@ -46,16 +50,46 @@ impl WeatherState {
     pub fn on_timer(&mut self) {
         let now = Utc::now();
         match self.fetch_state {
-            FetchState::Idle => {}
+            FetchState::Idle if self.last_updated.map_or(true, |v| now.hour() != v.hour()) => {
+                self.fetch_location();
+            }
             _ => {}
         }
+    }
+
+    fn fetch_location(&mut self) {
+        self.fetch_state = FetchState::FetchingLocation;
+        let mut context = BTreeMap::new();
+        context.insert(String::from("api"), String::from("location"));
+        web_request(
+            "http://ip-api.com/json/",
+            HttpVerb::Get,
+            BTreeMap::new(),
+            Vec::new(),
+            context,
+        );
+        self.last_requested = Some(Utc::now());
+    }
+
+    fn fetch_forecast(&mut self, location: &IpGeolocationResp) {
+        self.fetch_state = FetchState::FetchingForecast;
+        let url = format!(
+            "https://api.open-meteo.com/v1/forecast?latitude={}&longitude={}&hourly=temperature_2m,apparent_temperature,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min&timezone={}&forecast_days=2",
+            location.latitude,
+            location.longitude,
+            location.timezone.to_string().replace('/', "%2F"),
+        );
+        let mut context = BTreeMap::new();
+        context.insert(String::from("api"), String::from("forecast"));
+        web_request(url, HttpVerb::Get, BTreeMap::new(), Vec::new(), context);
+        self.last_requested = Some(Utc::now());
     }
 }
 
 enum FetchState {
     Idle,
-    GettingLocation,
-    GettingForecast,
+    FetchingLocation,
+    FetchingForecast,
 }
 
 pub enum WeatherCode {
@@ -108,7 +142,7 @@ impl WeatherCode {
             Self::DrizzleDense
             | Self::FreezingDrizzleLight
             | Self::FreezingDrizzleHeavy
-            | Self::RainShowersSlight
+            | Self::RainSlight
             | Self::RainModerate
             | Self::RainHeavy
             | Self::SnowFallModerate
