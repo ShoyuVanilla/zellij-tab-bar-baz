@@ -476,6 +476,7 @@ dependencies = [
  "iana-time-zone",
  "js-sys",
  "num-traits",
+ "serde",
  "wasm-bindgen",
  "windows-targets 0.48.5",
 ]
@@ -500,22 +501,6 @@ dependencies = [
  "parse-zoneinfo",
  "phf 0.11.2",
  "phf_codegen",
-]
-
-[[package]]
-name = "chrono-wasi"
-version = "0.4.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc966f9982ebc257d603e29e5e2ef7691826fc66b791a237b1e172a45a337143"
-dependencies = [
- "libc",
- "mach",
- "num-integer",
- "num-traits",
- "redox_syscall 0.1.57",
- "serde",
- "wasi 0.11.0+wasi-snapshot-preview1",
- "winapi",
 ]
 
 [[package]]
@@ -1718,15 +1703,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mach"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b823e83b2affd8f40a9ee8c29dbc56404c1e34cd2710921f2801e2cf29527afa"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "memchr"
 version = "2.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1923,16 +1899,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "num-integer"
-version = "0.1.45"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "225d3389fb3509a24c93f5c29eb6bde2586b98d9f016636dff58d7c6f7569cd9"
-dependencies = [
- "autocfg",
- "num-traits",
 ]
 
 [[package]]
@@ -2482,12 +2448,6 @@ checksum = "ca3129af7b92a17112d59ad498c6f81eaf463253766b90396d39ea7a39d6613c"
 dependencies = [
  "rand_core 0.5.1",
 ]
-
-[[package]]
-name = "redox_syscall"
-version = "0.1.57"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41cc0f7e4d5d4544e8861606a285bb08d3e70712ccc7d2b84d7c0ccfaf4b05ce"
 
 [[package]]
 name = "redox_syscall"
@@ -3081,8 +3041,9 @@ name = "tab-bar-baz"
 version = "0.1.0"
 dependencies = [
  "ansi_term",
+ "anyhow",
+ "chrono",
  "chrono-tz",
- "chrono-wasi",
  "colored",
  "serde",
  "serde_json",

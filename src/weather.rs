@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
-use chrono::{DateTime, NaiveDate, NaiveDateTime, Timelike, Utc};
+use anyhow::{Error, Result};
+use chrono::{offset::TimeZone, DateTime, NaiveDate, NaiveDateTime, Timelike, Utc};
 use chrono_tz::Tz;
 use serde::{Deserialize, Deserializer};
 use zellij_tile::prelude::*;
@@ -8,7 +9,7 @@ use zellij_tile::prelude::*;
 pub struct WeatherState {
     fetch_state: FetchState,
     forecast: Option<WeatherForecastResp>,
-    last_updated: Option<DateTime<Utc>>,
+    last_updated_forecast: Option<DateTime<Utc>>,
     last_requested: Option<DateTime<Utc>>,
     last_rendered: Option<DateTime<Utc>>,
     rendered: String,
@@ -19,7 +20,7 @@ impl WeatherState {
         Self {
             fetch_state: FetchState::Idle,
             forecast: None,
-            last_updated: None,
+            last_updated_forecast: None,
             last_requested: None,
             last_rendered: None,
             rendered: String::from(""),
@@ -37,30 +38,83 @@ impl WeatherState {
         );
     }
 
-    pub fn on_web_request(&mut self, e: Event) {
-        if let Event::WebRequestResult(status, _headers, body, _context) = e {
+    fn on_web_request_impl(&mut self, e: &Event) -> Result<bool> {
+        if let Event::WebRequestResult(status, _headers, body, context) = e {
+            let api = context.get("api");
+            if api.is_none() {
+                return Ok(false);
+            }
+            let api = api.unwrap();
+
+            let requested_at = context.get("requested-at");
+            if requested_at.map_or(true, |v| {
+                self.last_requested.map_or(true, |v2| &v2.to_string() != v)
+            }) {
+                return Ok(false);
+            }
+
+            if !(200..=299).contains(status) {
+                bail!(
+                    "Api: {}, Status: {}, Body: {}",
+                    api,
+                    status,
+                    String::from_utf8_lossy(body),
+                );
+            }
+
             match self.fetch_state {
-                FetchState::Idle => {}
-                FetchState::FetchingLocation => {}
-                FetchState::FetchingForecast => {}
+                FetchState::FetchingLocation if api == "location" => {
+                    let resp: IpGeolocationResp =
+                        serde_json::from_slice(body).map_err(Error::msg)?;
+                    self.fetch_state = FetchState::FetchingForecast;
+                    self.fetch_forecast(&resp);
+                    Ok(false)
+                }
+                FetchState::FetchingForecast if api == "forecast" => {
+                    let resp: WeatherForecastResp =
+                        serde_json::from_slice(body).map_err(Error::msg)?;
+                    self.last_updated_forecast = Some(Utc::now());
+                    self.fetch_state = FetchState::Idle;
+                    Ok(true)
+                }
+                _ => Ok(false),
+            }
+        } else {
+            unreachable!()
+        }
+    }
+
+    pub fn on_web_request(&mut self, e: &Event) -> bool {
+        match self.on_web_request_impl(e) {
+            Ok(b) => b,
+            Err(e) => {
+                eprintln!("[Error Request] - {:?}", e);
+                false
             }
         }
     }
 
-    pub fn on_timer(&mut self) {
+    pub fn on_timer(&mut self) -> bool {
         let now = Utc::now();
         match self.fetch_state {
-            FetchState::Idle if self.last_updated.map_or(true, |v| now.hour() != v.hour()) => {
+            FetchState::Idle
+                if self
+                    .last_updated_forecast
+                    .map_or(true, |v| now.hour() != v.hour()) =>
+            {
                 self.fetch_location();
             }
             _ => {}
         }
+        false
     }
 
     fn fetch_location(&mut self) {
         self.fetch_state = FetchState::FetchingLocation;
+        let now = Utc::now();
         let mut context = BTreeMap::new();
         context.insert(String::from("api"), String::from("location"));
+        context.insert(String::from("requested-at"), now.to_string());
         web_request(
             "http://ip-api.com/json/",
             HttpVerb::Get,
@@ -68,7 +122,7 @@ impl WeatherState {
             Vec::new(),
             context,
         );
-        self.last_requested = Some(Utc::now());
+        self.last_requested = Some(now);
     }
 
     fn fetch_forecast(&mut self, location: &IpGeolocationResp) {
@@ -79,11 +133,15 @@ impl WeatherState {
             location.longitude,
             location.timezone.to_string().replace('/', "%2F"),
         );
+        let now = Utc::now();
         let mut context = BTreeMap::new();
         context.insert(String::from("api"), String::from("forecast"));
+        context.insert(String::from("requested-at"), now.to_string());
         web_request(url, HttpVerb::Get, BTreeMap::new(), Vec::new(), context);
-        self.last_requested = Some(Utc::now());
+        self.last_requested = Some(now);
     }
+
+    fn render(&mut self) {}
 }
 
 enum FetchState {
@@ -213,6 +271,20 @@ where
     let s = String::deserialize(deserializer)?;
     s.parse().map_err(serde::de::Error::custom)
 }
+
+struct WeatherForecast {
+    timezone: Tz,
+}
+
+struct HourlyForecast {
+    time: DateTime<Tz>,
+}
+
+struct DailyForecast {
+    time: DateTime<Tz>,
+}
+
+fn foo(timezone: Tz, datetime: NaiveDateTime) {}
 
 #[derive(Deserialize)]
 struct WeatherForecastResp {

@@ -9,7 +9,8 @@ ansi_term = "0.12"
 unicode-width = "0.1.8"
 zellij-tile = "0.39"
 zellij-tile-utils = "0.39"
-chrono-wasi = { version = "0.4", features = ["serde"] }
+anyhow = { version = "1.0", default-features = false }
+chrono = { version = "0.4", default-features = false, features = ["clock", "wasmbind", "serde"] }
 chrono-tz = { version = "0.8", default-features = false }
 serde = { version = "1.0", default-features = false, features = [
   "alloc",
