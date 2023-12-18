@@ -11,7 +11,6 @@ use zellij_tile::prelude::*;
 
 use crate::line::tab_line;
 use crate::tab::tab_style;
-use crate::weather::WeatherState;
 
 #[derive(Debug, Default)]
 pub struct LinePart {

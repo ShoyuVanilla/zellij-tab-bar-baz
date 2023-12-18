@@ -284,8 +284,6 @@ struct DailyForecast {
     time: DateTime<Tz>,
 }
 
-fn foo(timezone: Tz, datetime: NaiveDateTime) {}
-
 #[derive(Deserialize)]
 struct WeatherForecastResp {
     #[serde(deserialize_with = "deserialize_tz")]
